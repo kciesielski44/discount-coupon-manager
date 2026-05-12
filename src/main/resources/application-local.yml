@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/coupons
+    username: coupons
+    password: coupons
+  jpa:
+    show-sql: true
+  flyway:
+    locations: classpath:db/migration
+
+logging:
+  level:
+    com.empik.coupons: DEBUG

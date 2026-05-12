@@ -1,0 +1,11 @@
+target/
+*.jar
+*.war
+*.class
+dependency-reduced-pom.xml
+
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
