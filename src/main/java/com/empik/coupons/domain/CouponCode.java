@@ -4,7 +4,7 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * Kod kuponu (wartość jest case-insensitive, przechowywana jako znormalizowany lower case)
+ * Kod kuponu (wartość "value" jest case-insensitive, przechowywana jako znormalizowany lower case)
  */
 public record CouponCode(String value) {
 
