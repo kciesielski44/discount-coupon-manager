@@ -1,46 +1,59 @@
 package com.empik.coupons.api;
 
-import com.empik.coupons.domain.CouponCodeAlreadyExistsException;
-import com.empik.coupons.domain.CouponExhaustedException;
-import com.empik.coupons.domain.CouponNotFoundException;
+import com.empik.coupons.domain.CouponDomainException;
+import com.empik.coupons.domain.CouponErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.List;
+
 /**
- * Mapowanie wyjątków domenowych na odpowiedzi HTTP.
+ * Mapowanie wyjątków na strukturalne odpowiedzi błędów
  */
 @RestControllerAdvice
 class CouponExceptionAdvice {
 
     /**
-     * Konflikt duplikatu kodu (409)
+     * Polimorficzny handler dla wszystkich wyjątków domenowych kuponu
      */
-    @ExceptionHandler(CouponCodeAlreadyExistsException.class)
-    ResponseEntity<ApiError> handleAlreadyExists(CouponCodeAlreadyExistsException ex) {
+    @ExceptionHandler(CouponDomainException.class)
+    ResponseEntity<ApiError> handleDomain(CouponDomainException ex) {
+        HttpStatus status = httpStatusFor(ex.errorCode());
         return ResponseEntity
-                .status(HttpStatus.CONFLICT)
-                .body(new ApiError("COUPON_CODE_ALREADY_EXISTS", ex.getMessage()));
+                .status(status)
+                .body(new ApiError(ex.errorCode().name(), ex.getMessage()));
     }
 
     /**
-     * Nieznany kod kuponu (404)
+     * Strukturyzacja błędów Bean Validation. Klient dostaje listę pól w details
      */
-    @ExceptionHandler(CouponNotFoundException.class)
-    ResponseEntity<ApiError> handleNotFound(CouponNotFoundException ex) {
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex) {
+        List<FieldError> fields = ex.getBindingResult().getFieldErrors().stream()
+                .map(error -> new FieldError(error.getField(), error.getDefaultMessage()))
+                .toList();
         return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(new ApiError("COUPON_NOT_FOUND", ex.getMessage()));
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ApiError("VALIDATION_FAILED", "Request validation failed", fields));
     }
 
     /**
-     * Kupon osiągnął już maksymalną liczbę użyć (409)
+     * Błędy konstrukcji value objectów (np. nieprawidłowy format CouponCode, nieznany CountryCode).
      */
-    @ExceptionHandler(CouponExhaustedException.class)
-    ResponseEntity<ApiError> handleExhausted(CouponExhaustedException ex) {
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex) {
         return ResponseEntity
-                .status(HttpStatus.CONFLICT)
-                .body(new ApiError("COUPON_EXHAUSTED", ex.getMessage()));
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ApiError("INVALID_REQUEST", ex.getMessage()));
+    }
+
+    private static HttpStatus httpStatusFor(CouponErrorCode code) {
+        return switch (code) {
+            case COUPON_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case COUPON_EXHAUSTED, COUPON_CODE_ALREADY_EXISTS -> HttpStatus.CONFLICT;
+        };
     }
 }

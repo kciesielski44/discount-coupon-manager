@@ -78,11 +78,43 @@ class CouponControllerTest {
     }
 
     @Test
-    void returns400WhenRequestBodyIsInvalid() throws Exception {
+    void returns400WithStructuredDetailsWhenRequestBodyIsInvalid() throws Exception {
         mockMvc.perform(post("/coupons")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ \"code\": \"\", \"maxUsages\": -5, \"country\": \"\" }"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.details").isArray())
+                .andExpect(jsonPath("$.details[?(@.field=='code')]").exists())
+                .andExpect(jsonPath("$.details[?(@.field=='maxUsages')]").exists())
+                .andExpect(jsonPath("$.details[?(@.field=='country')]").exists());
+    }
+
+    @Test
+    void returns400WhenValueObjectConstructionFailsInService() throws Exception {
+        when(createCoupon.create(any(CreateCouponCommand.class)))
+                .thenThrow(new IllegalArgumentException("Country code must be ISO 3166-1 alpha-2. Value: XYZ"));
+
+        mockMvc.perform(post("/coupons")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ \"code\": \"wiosna\", \"maxUsages\": 10, \"country\": \"XYZ\" }"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.details").doesNotExist());
+    }
+
+    @Test
+    void returns400WhenCouponCodeFormatIsRejectedOnUsage() throws Exception {
+        when(useCoupon.use(any(UseCouponCommand.class)))
+                .thenThrow(new IllegalArgumentException("Coupon code must match [A-Za-z0-9_-]{1,64}. Value: abc#xyz"));
+
+        mockMvc.perform(post("/coupons/abc%23xyz/usages"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.details").doesNotExist());
     }
 
     @Test
