@@ -2,10 +2,14 @@ package com.empik.coupons.api;
 
 import com.empik.coupons.application.CreateCouponCommand;
 import com.empik.coupons.application.CreateCouponUseCase;
+import com.empik.coupons.application.UseCouponCommand;
+import com.empik.coupons.application.UseCouponUseCase;
 import com.empik.coupons.domain.CountryCode;
 import com.empik.coupons.domain.Coupon;
 import com.empik.coupons.domain.CouponCode;
 import com.empik.coupons.domain.CouponCodeAlreadyExistsException;
+import com.empik.coupons.domain.CouponExhaustedException;
+import com.empik.coupons.domain.CouponNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -39,6 +43,9 @@ class CouponControllerTest {
 
     @MockitoBean
     private CreateCouponUseCase createCoupon;
+
+    @MockitoBean
+    private UseCouponUseCase useCoupon;
 
     @Test
     void createsCouponAndReturns201WithLocation() throws Exception {
@@ -88,6 +95,51 @@ class CouponControllerTest {
                         .content("{ \"code\": \"wiosna\", \"maxUsages\": 10, \"country\": \"PL\" }"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("COUPON_CODE_ALREADY_EXISTS"))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void usesCouponAndReturns200WithUpdatedState() throws Exception {
+        UUID id = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-05-13T10:15:30Z");
+        when(useCoupon.use(any(UseCouponCommand.class)))
+                .thenReturn(new Coupon(
+                        id,
+                        new CouponCode("wiosna"),
+                        createdAt,
+                        100,
+                        1,
+                        new CountryCode("PL")
+                ));
+
+        mockMvc.perform(post("/coupons/WIOSNA/usages"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("wiosna"))
+                .andExpect(jsonPath("$.currentUsages").value(1));
+
+        verify(useCoupon).use(new UseCouponCommand("WIOSNA"));
+    }
+
+    @Test
+    void returns404WhenCouponDoesNotExist() throws Exception {
+        when(useCoupon.use(any(UseCouponCommand.class)))
+                .thenThrow(new CouponNotFoundException(new CouponCode("missing")));
+
+        mockMvc.perform(post("/coupons/missing/usages"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("COUPON_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void returns409WhenCouponIsExhausted() throws Exception {
+        when(useCoupon.use(any(UseCouponCommand.class)))
+                .thenThrow(new CouponExhaustedException(new CouponCode("wiosna")));
+
+        mockMvc.perform(post("/coupons/wiosna/usages"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COUPON_EXHAUSTED"))
                 .andExpect(jsonPath("$.message").exists());
     }
 }

@@ -2,9 +2,12 @@ package com.empik.coupons.api;
 
 import com.empik.coupons.application.CreateCouponCommand;
 import com.empik.coupons.application.CreateCouponUseCase;
+import com.empik.coupons.application.UseCouponCommand;
+import com.empik.coupons.application.UseCouponUseCase;
 import com.empik.coupons.domain.Coupon;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,9 +21,11 @@ import java.net.URI;
 class CouponController {
 
     private final CreateCouponUseCase createCoupon;
+    private final UseCouponUseCase useCoupon;
 
-    CouponController(CreateCouponUseCase createCoupon) {
+    CouponController(CreateCouponUseCase createCoupon, UseCouponUseCase useCoupon) {
         this.createCoupon = createCoupon;
+        this.useCoupon = useCoupon;
     }
 
     @PostMapping
@@ -41,5 +46,11 @@ class CouponController {
         return ResponseEntity
                 .created(location)
                 .body(CouponResponse.from(coupon));
+    }
+
+    @PostMapping("/{code}/usages")
+    ResponseEntity<CouponResponse> use(@PathVariable String code) {
+        Coupon coupon = useCoupon.use(new UseCouponCommand(code));
+        return ResponseEntity.ok(CouponResponse.from(coupon));
     }
 }
