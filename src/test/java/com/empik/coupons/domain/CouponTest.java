@@ -90,4 +90,45 @@ class CouponTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("currentUsages");
     }
+
+    @Test
+    void useReturnsNewCouponWithIncrementedUsages() {
+        Coupon coupon = new Coupon(ID, CODE, CREATED_AT, 10, 3, COUNTRY);
+
+        Coupon used = coupon.use();
+
+        assertThat(used.currentUsages()).isEqualTo(4);
+        assertThat(used.id()).isEqualTo(ID);
+        assertThat(used.code()).isEqualTo(CODE);
+        assertThat(used.createdAt()).isEqualTo(CREATED_AT);
+        assertThat(used.maxUsages()).isEqualTo(10);
+        assertThat(used.country()).isEqualTo(COUNTRY);
+    }
+
+    @Test
+    void useLeavesOriginalCouponUntouched() {
+        Coupon coupon = new Coupon(ID, CODE, CREATED_AT, 10, 3, COUNTRY);
+
+        coupon.use();
+
+        assertThat(coupon.currentUsages()).isEqualTo(3);
+    }
+
+    @Test
+    void useAllowsConsumingTheLastAvailableUsage() {
+        Coupon coupon = new Coupon(ID, CODE, CREATED_AT, 5, 4, COUNTRY);
+
+        Coupon used = coupon.use();
+
+        assertThat(used.currentUsages()).isEqualTo(used.maxUsages());
+    }
+
+    @Test
+    void useThrowsWhenCouponIsExhausted() {
+        Coupon coupon = new Coupon(ID, CODE, CREATED_AT, 10, 10, COUNTRY);
+
+        assertThatThrownBy(coupon::use)
+                .isInstanceOf(CouponExhaustedException.class)
+                .hasMessageContaining(CODE.value());
+    }
 }

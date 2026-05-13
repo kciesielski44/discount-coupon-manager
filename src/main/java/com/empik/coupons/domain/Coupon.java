@@ -32,4 +32,14 @@ public record Coupon(
                     "currentUsages (%d) must not exceed maxUsages (%d)".formatted(currentUsages, maxUsages));
         }
     }
+
+    /**
+     * Rejestruje pojedyncze użycie i zwraca nowy stan kuponu. Oryginał pozostaje niezmieniony
+     */
+    public Coupon use() {
+        if (currentUsages == maxUsages) {
+            throw new CouponExhaustedException(code);
+        }
+        return new Coupon(id, code, createdAt, maxUsages, currentUsages + 1, country);
+    }
 }
