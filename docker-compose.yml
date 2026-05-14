@@ -16,5 +16,29 @@ services:
       timeout: 3s
       retries: 10
 
+  app:
+    build: .
+    container_name: coupons-app
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/coupons
+      SPRING_DATASOURCE_USERNAME: coupons
+      SPRING_DATASOURCE_PASSWORD: coupons
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: coupons-prometheus
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - app
+
 volumes:
   coupons-postgres-data:

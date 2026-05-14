@@ -1,7 +1,9 @@
 package com.empik.coupons.infrastructure.geoip;
 
 import com.empik.coupons.domain.CountryCode;
+import com.empik.coupons.infrastructure.metrics.CouponMetrics;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -34,7 +36,7 @@ class IpApiGeoIpAdapterTest {
     @BeforeEach
     void setUp() {
         RestClient client = RestClient.builder().baseUrl(wireMock.baseUrl()).build();
-        adapter = new IpApiGeoIpAdapter(client);
+        adapter = new IpApiGeoIpAdapter(client, new CouponMetrics(new SimpleMeterRegistry()));
     }
 
     @Test

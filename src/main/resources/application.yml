@@ -11,7 +11,9 @@ spring:
     type: caffeine
     cache-names: geoip-lookups
     caffeine:
-      spec: maximumSize=10000,expireAfterWrite=6h
+      # recordStats włącza statystyki Caffeine (hit/miss/eviction). Spring Boot auto-binduje je do
+      # Micrometera pod metryką cache.gets
+      spec: maximumSize=10000,expireAfterWrite=6h,recordStats
 
 server:
   port: 8080
@@ -54,11 +56,14 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:
         enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 logging:
   level:

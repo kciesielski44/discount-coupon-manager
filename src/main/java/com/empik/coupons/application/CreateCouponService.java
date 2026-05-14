@@ -5,6 +5,7 @@ import com.empik.coupons.domain.Coupon;
 import com.empik.coupons.domain.CouponCode;
 import com.empik.coupons.domain.CouponCodeAlreadyExistsException;
 import com.empik.coupons.domain.CouponRepository;
+import com.empik.coupons.infrastructure.metrics.CouponMetrics;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -13,7 +14,7 @@ import java.util.UUID;
 /**
  * Realizacja portu CreateCouponUseCase.
  *
- * Konflikt kodu kuponmu jest sprawdzany jawnie (existsByCode) z dwóch powodów:
+ * Konflikt kodu kuponu jest sprawdzany jawnie (existsByCode) z dwóch powodów:
  * daje czytelny wyjątek domenowy zamiast wycieku
  * i pozwala kontrolerowi mapować błąd bez znajomości szczegółów infrastruktury.
  */
@@ -21,19 +22,13 @@ import java.util.UUID;
 class CreateCouponService implements CreateCouponUseCase {
 
     private final CouponRepository repository;
+    private final CouponMetrics metrics;
 
-    CreateCouponService(CouponRepository repository) {
+    CreateCouponService(CouponRepository repository, CouponMetrics metrics) {
         this.repository = repository;
+        this.metrics = metrics;
     }
 
-    /**
-     * TODO  transakcja ? teoretyczna utrata atomowości na create ???
-     * Bez transakcji teoretycznie inne żądanie mogłoby wcisnąć duplikat między tymi wywołaniami (existsByCode, save)
-     * Alee z Transactional przy poziomie izolacji read_commited (default przy postgresie) również istnieje chyba takie ryzyko ??
-     * bo existsByCode nie zakłada locka na nieistniejący wiersz. Ostateczny strażnik unikalności to i tak UNIQUE constraint w bazie
-     * Implementacja bez Transakcji teoretycznie powinna wystarczyć na potrzeby tworzenia kuponu
-     * Do weryfikacji na koniec
-     */
     @Override
     public Coupon create(CreateCouponCommand command) {
         CouponCode code = new CouponCode(command.code());
@@ -48,6 +43,8 @@ class CreateCouponService implements CreateCouponUseCase {
                 0,
                 new CountryCode(command.country())
         );
-        return repository.save(coupon);
+        Coupon saved = repository.save(coupon);
+        metrics.recordCouponCreated();
+        return saved;
     }
 }

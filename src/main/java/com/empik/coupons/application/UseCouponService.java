@@ -5,10 +5,12 @@ import com.empik.coupons.domain.CountryCode;
 import com.empik.coupons.domain.Coupon;
 import com.empik.coupons.domain.CouponCode;
 import com.empik.coupons.domain.CouponCountryNotAllowedException;
+import com.empik.coupons.domain.CouponDomainException;
 import com.empik.coupons.domain.CouponExhaustedException;
 import com.empik.coupons.domain.CouponNotFoundException;
 import com.empik.coupons.domain.CouponRepository;
 import com.empik.coupons.domain.GeoIp;
+import com.empik.coupons.infrastructure.metrics.CouponMetrics;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +25,12 @@ class UseCouponService implements UseCouponUseCase {
 
     private final CouponRepository repository;
     private final GeoIp geoIp;
+    private final CouponMetrics metrics;
 
-    UseCouponService(CouponRepository repository, GeoIp geoIp) {
+    UseCouponService(CouponRepository repository, GeoIp geoIp, CouponMetrics metrics) {
         this.repository = repository;
         this.geoIp = geoIp;
+        this.metrics = metrics;
     }
 
     /**
@@ -38,17 +42,24 @@ class UseCouponService implements UseCouponUseCase {
     @Override
     @Transactional
     public Coupon use(UseCouponCommand command) {
-        CouponCode code = new CouponCode(command.code());
-        Coupon coupon = repository.findByCode(code)
-                .orElseThrow(() -> new CouponNotFoundException(code));
+        try {
+            CouponCode code = new CouponCode(command.code());
+            Coupon coupon = repository.findByCode(code)
+                    .orElseThrow(() -> new CouponNotFoundException(code));
 
-        CountryCode clientCountry = resolveClientCountry(coupon, command.clientIp());
-        if (!clientCountry.equals(coupon.country())) {
-            throw new CouponCountryNotAllowedException(code, clientCountry, coupon.country());
+            CountryCode clientCountry = resolveClientCountry(coupon, command.clientIp());
+            if (!clientCountry.equals(coupon.country())) {
+                throw new CouponCountryNotAllowedException(code, clientCountry, coupon.country());
+            }
+
+            Coupon updated = repository.registerUsage(code)
+                    .orElseThrow(() -> new CouponExhaustedException(code));
+            metrics.recordUsageAttempt(CouponMetrics.UsageResult.SUCCESS);
+            return updated;
+        } catch (CouponDomainException ex) {
+            metrics.recordUsageAttempt(CouponMetrics.UsageResult.fromErrorCode(ex.errorCode()));
+            throw ex;
         }
-
-        return repository.registerUsage(code)
-                .orElseThrow(() -> new CouponExhaustedException(code));
     }
 
     private CountryCode resolveClientCountry(Coupon coupon, String clientIp) {
