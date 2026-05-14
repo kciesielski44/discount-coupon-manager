@@ -14,4 +14,10 @@ public interface CouponRepository {
     Optional<Coupon> findByCode(CouponCode code);
 
     boolean existsByCode(CouponCode code);
+
+    /**
+     * Atomowo rejestruje pojedyncze użycie kuponu o podanym kodzie i zwraca jego nowy stan
+     * Empty oznacza że operacja nie zmieniła stanu (kupon nie istnieje albo osiągnął limit)
+     */
+    Optional<Coupon> registerUsage(CouponCode code);
 }

@@ -35,4 +35,10 @@ class CouponRepositoryAdapter implements CouponRepository {
     public boolean existsByCode(CouponCode code) {
         return couponSpringDataRepository.existsByCode(code.value());
     }
+
+    @Override
+    public Optional<Coupon> registerUsage(CouponCode code) {
+        return couponSpringDataRepository.incrementUsagesIfAvailable(code.value())
+                .map(CouponEntityMapper::toDomain);
+    }
 }
