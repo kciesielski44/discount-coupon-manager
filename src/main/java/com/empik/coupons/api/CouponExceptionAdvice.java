@@ -54,6 +54,8 @@ class CouponExceptionAdvice {
         return switch (code) {
             case COUPON_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case COUPON_EXHAUSTED, COUPON_CODE_ALREADY_EXISTS -> HttpStatus.CONFLICT;
+            case COUNTRY_NOT_ALLOWED -> HttpStatus.FORBIDDEN;
+            case CLIENT_COUNTRY_UNRESOLVED -> HttpStatus.UNPROCESSABLE_ENTITY;
         };
     }
 }

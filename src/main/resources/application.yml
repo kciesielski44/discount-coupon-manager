@@ -7,9 +7,48 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  cache:
+    type: caffeine
+    cache-names: geoip-lookups
+    caffeine:
+      spec: maximumSize=10000,expireAfterWrite=6h
 
 server:
   port: 8080
+  tomcat:
+    remoteip:
+      # Włącza RemoteIpValve. Tomcat respektuje X-Forwarded-For wyłącznie wtedy, gdy żądanie
+      # dochodzi z zakresu internal-proxies (default: RFC1918 + loopback). Inaczej XFF jest
+      # ignorowany i request.getRemoteAddr() zwraca surowy adres socketu.
+      remote-ip-header: X-Forwarded-For
+      protocol-header: X-Forwarded-Proto
+
+app:
+  geoip:
+    base-url: http://ip-api.com
+    connect-timeout: 2s
+    read-timeout: 2s
+
+resilience4j:
+  retry:
+    instances:
+      geoip:
+        max-attempts: 2
+        wait-duration: 100ms
+        retry-exceptions:
+          - org.springframework.web.client.RestClientException
+          - java.io.IOException
+  circuitbreaker:
+    instances:
+      geoip:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 1s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - org.springframework.web.client.RestClientException
+          - java.io.IOException
 
 management:
   endpoints:

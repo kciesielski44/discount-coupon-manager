@@ -38,7 +38,14 @@ class CouponRepositoryAdapter implements CouponRepository {
 
     @Override
     public Optional<Coupon> registerUsage(CouponCode code) {
-        return couponSpringDataRepository.incrementUsagesIfAvailable(code.value())
+        int updatedRows = couponSpringDataRepository.incrementUsagesIfAvailable(code.value());
+        if (updatedRows == 0) {
+            return Optional.empty();
+        }
+
+        // Persistence Context po updatcie jest czyszczony (clearAutomatically=true),
+        // więc kolejny findByCode trafi do bazy i zwróci świeży stan kuponu
+        return couponSpringDataRepository.findByCode(code.value())
                 .map(CouponEntityMapper::toDomain);
     }
 }

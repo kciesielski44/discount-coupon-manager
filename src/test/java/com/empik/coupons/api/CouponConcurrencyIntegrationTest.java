@@ -1,8 +1,11 @@
 package com.empik.coupons.api;
 
 import com.empik.coupons.domain.Coupon;
+import com.empik.coupons.domain.CountryCode;
 import com.empik.coupons.domain.CouponCode;
 import com.empik.coupons.domain.CouponRepository;
+import com.empik.coupons.domain.GeoIp;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -16,10 +19,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,10 +32,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 /**
  * Test współbieżności: 100 równoległych żądań na kuponie z maxUsages=10 musi dać dokładnie
  * 10 sukcesów i 90 odmów.
+ *
+ * GeoIp jest zamockowany na stałe PL dla "8.8.8.8"
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
@@ -45,12 +54,21 @@ class CouponConcurrencyIntegrationTest {
     private static final int CONCURRENT_REQUESTS = 100;
     private static final int MAX_USAGES = 10;
     private static final String COUPON_CODE = "BLACK_FRIDAY";
+    private static final String CLIENT_IP = "8.8.8.8";
 
     @Autowired
     private TestRestTemplate restTemplate;
 
     @Autowired
     private CouponRepository repository;
+
+    @MockitoBean
+    private GeoIp geoIp;
+
+    @BeforeEach
+    void stubGeoIp() {
+        when(geoIp.lookup(any())).thenReturn(Optional.of(new CountryCode("PL")));
+    }
 
     @Test
     void exactlyMaxUsagesSucceedUnderConcurrentLoad() throws Exception {
@@ -116,10 +134,12 @@ class CouponConcurrencyIntegrationTest {
     }
 
     private ResponseEntity<String> useCoupon() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Forwarded-For", CLIENT_IP);
         return restTemplate.exchange(
                 "/coupons/" + COUPON_CODE + "/usages",
                 HttpMethod.POST,
-                HttpEntity.EMPTY,
+                new HttpEntity<>(headers),
                 String.class);
     }
 }

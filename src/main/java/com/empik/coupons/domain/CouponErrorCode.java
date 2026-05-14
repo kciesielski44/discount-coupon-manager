@@ -6,5 +6,7 @@ package com.empik.coupons.domain;
 public enum CouponErrorCode {
     COUPON_NOT_FOUND,
     COUPON_EXHAUSTED,
-    COUPON_CODE_ALREADY_EXISTS
+    COUPON_CODE_ALREADY_EXISTS,
+    COUNTRY_NOT_ALLOWED,
+    CLIENT_COUNTRY_UNRESOLVED
 }

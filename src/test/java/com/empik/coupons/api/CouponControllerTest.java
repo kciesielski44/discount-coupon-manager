@@ -4,10 +4,12 @@ import com.empik.coupons.application.CreateCouponCommand;
 import com.empik.coupons.application.CreateCouponUseCase;
 import com.empik.coupons.application.UseCouponCommand;
 import com.empik.coupons.application.UseCouponUseCase;
+import com.empik.coupons.domain.ClientCountryUnresolvedException;
 import com.empik.coupons.domain.CountryCode;
 import com.empik.coupons.domain.Coupon;
 import com.empik.coupons.domain.CouponCode;
 import com.empik.coupons.domain.CouponCodeAlreadyExistsException;
+import com.empik.coupons.domain.CouponCountryNotAllowedException;
 import com.empik.coupons.domain.CouponExhaustedException;
 import com.empik.coupons.domain.CouponNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -144,13 +146,14 @@ class CouponControllerTest {
                         new CountryCode("PL")
                 ));
 
-        mockMvc.perform(post("/coupons/WIOSNA/usages"))
+        mockMvc.perform(post("/coupons/WIOSNA/usages")
+                        .with(request -> { request.setRemoteAddr("8.8.8.8"); return request; }))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value("wiosna"))
                 .andExpect(jsonPath("$.currentUsages").value(1));
 
-        verify(useCoupon).use(new UseCouponCommand("WIOSNA"));
+        verify(useCoupon).use(new UseCouponCommand("WIOSNA", "8.8.8.8"));
     }
 
     @Test
@@ -172,6 +175,35 @@ class CouponControllerTest {
         mockMvc.perform(post("/coupons/wiosna/usages"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("COUPON_EXHAUSTED"))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void returns403WhenClientCountryDoesNotMatchCouponCountry() throws Exception {
+        when(useCoupon.use(any(UseCouponCommand.class)))
+                .thenThrow(new CouponCountryNotAllowedException(
+                        new CouponCode("wiosna"),
+                        new CountryCode("DE"),
+                        new CountryCode("PL")
+                ));
+
+        mockMvc.perform(post("/coupons/wiosna/usages"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("COUNTRY_NOT_ALLOWED"))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void returns422WhenClientCountryCannotBeResolved() throws Exception {
+        when(useCoupon.use(any(UseCouponCommand.class)))
+                .thenThrow(new ClientCountryUnresolvedException(
+                        new CouponCode("wiosna"),
+                        "127.0.0.1"
+                ));
+
+        mockMvc.perform(post("/coupons/wiosna/usages"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("CLIENT_COUNTRY_UNRESOLVED"))
                 .andExpect(jsonPath("$.message").exists());
     }
 }
